@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,11 +17,12 @@ import (
 )
 
 func main() {
-	var objectType, objectName, objectNamespace, selector string
+	var objectType, objectName, objectNamespace, selector, value string
 	flag.StringVar(&objectType, "type", "", "Kubernetes object type")
 	flag.StringVar(&objectName, "name", "", "Kubernetes object name")
 	flag.StringVar(&objectNamespace, "namespace", "default", "Kubernetes object namespace")
 	flag.StringVar(&selector, "selector", "", "Kubernetes field selector")
+	flag.StringVar(&value, "value", "", "Expected value for the selected field")
 	flag.Parse()
 
 	if objectType == "" || objectName == "" {
@@ -65,6 +68,16 @@ func main() {
 			return
 		}
 		panic(err.Error())
+	}
+
+	// Use jq to filter the output based on the selector and the expected value
+	if value != "" {
+		cmd := exec.Command("jq", "-e", fmt.Sprintf(".%s == \"%s\"", strings.ReplaceAll(selector, ",", "\",\""), value))
+		cmd.Stdin = strings.NewReader(string(object))
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Kubernetes %s %s in namespace %s does not have the expected value %s for the field selector %s\n", objectType, objectName, objectNamespace, value, selector)
+			return
+		}
 	}
 
 	// Output the JSON definition of the Kubernetes object
