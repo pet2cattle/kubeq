@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"github.com/tidwall/sjson"
 )
 
 func main() {
@@ -72,12 +73,20 @@ func main() {
 
 	// Use jq to filter the output based on the selector and the expected value
 	if value != "" {
-		cmd := exec.Command("jq", "-e", fmt.Sprintf(".%s == \"%s\"", strings.ReplaceAll(selector, ",", "\",\""), value))
-		cmd.Stdin = strings.NewReader(string(object))
-		if err := cmd.Run(); err != nil {
-			fmt.Printf("Kubernetes %s %s in namespace %s does not have the expected value %s for the field selector %s\n", objectType, objectName, objectNamespace, value, selector)
-			return
-		}
+jsonString := string(object)
+
+// Use sjson to get the value of the selector
+value, err := sjson.Get(jsonString, selector)
+if err != nil {
+    fmt.Printf("Error getting value for selector %s: %s\n", selector, err.Error())
+    return
+}
+
+// Check if the value matches the expected value
+if value != expectedValue {
+    fmt.Printf("Kubernetes %s %s in namespace %s does not have the expected value %s for the field selector %s\n", objectType, objectName, objectNamespace, expectedValue, selector)
+    return
+}
 	}
 
 	// Output the JSON definition of the Kubernetes object
