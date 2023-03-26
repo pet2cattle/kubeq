@@ -8,16 +8,18 @@ import (
 	"path/filepath"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
-	var objectType, objectName, objectNamespace string
+	var objectType, objectName, objectNamespace, selector string
 	flag.StringVar(&objectType, "type", "", "Kubernetes object type")
 	flag.StringVar(&objectName, "name", "", "Kubernetes object name")
 	flag.StringVar(&objectNamespace, "namespace", "default", "Kubernetes object namespace")
+	flag.StringVar(&selector, "selector", "", "Kubernetes field selector")
 	flag.Parse()
 
 	if objectType == "" || objectName == "" {
@@ -44,10 +46,17 @@ func main() {
 	}
 
 	// Get the specified Kubernetes object
+	options := v1.GetOptions{}
+	if selector != "" {
+		options = v1.GetOptions{
+			FieldSelector: selector,
+		}
+	}
 	object, err := clientset.CoreV1().RESTClient().Get().
 		Namespace(objectNamespace).
 		Resource(objectType + "s").
 		Name(objectName).
+		VersionedParams(&options, v1.ParameterCodec).
 		Do(context.Background()).
 		Raw()
 	if err != nil {
